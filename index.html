@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KFA Attendance Scanner</title>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f2f4f2;
+      padding: 15px;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    h2 {
+      color: #14532d;
+    }
+
+    button {
+      padding: 14px;
+      margin: 8px;
+      border: none;
+      border-radius: 7px;
+      font-size: 16px;
+      color: white;
+      background: #14532d;
+    }
+
+    #stop {
+      background: #b91c1c;
+    }
+
+    #message {
+      font-weight: bold;
+      margin-top: 18px;
+      font-size: 17px;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>KINTOS FOOTBALL ACADEMY</h2>
+    <h3>OFFICIAL PLAYER ATTENDANCE SCANNER</h3>
+
+    <div id="reader"></div>
+
+    <button onclick="startScanner()">START QR SCANNER</button>
+    <button id="stop" onclick="stopScanner()">STOP SCANNER</button>
+
+    <div id="message">Ready to scan.</div>
+  </div>
+
+  <script>
+    const API_URL =
+      "https://script.google.com/macros/s/AKfycbzl04cObuFOGj5-2ANA9bie_BMWBUgEaTBqzBZtSSEEdhQTs10XfMERSfRnD1q6g98sqw/exec";
+
+    let scanner = null;
+    let busy = false;
+
+    function showMessage(message, color) {
+      const box = document.getElementById("message");
+      box.textContent = message;
+      box.style.color = color || "#14532d";
+    }
+
+    function startScanner() {
+      if (scanner) return;
+
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        function(decodedText) {
+          if (busy) return;
+
+          busy = true;
+          scanner.pause(true);
+          showMessage("Checking player...", "#1d4ed8");
+
+          const script = document.createElement("script");
+
+          window.kfaScanCallback = function(result) {
+            if (result.success) {
+              showMessage(
+                "PRESENT: " + result.name + " (" + result.playerId + ")",
+                "#15803d"
+              );
+            } else {
+              showMessage(result.message, "#b91c1c");
+            }
+
+            script.remove();
+            busy = false;
+
+            setTimeout(function() {
+              if (scanner) scanner.resume();
+            }, 1800);
+          };
+
+          script.onerror = function() {
+            showMessage("Connection failed. Please try again.", "#b91c1c");
+            script.remove();
+            busy = false;
+
+            if (scanner) scanner.resume();
+          };
+
+          script.src =
+            API_URL +
+            "?action=scan&token=" +
+            encodeURIComponent(decodedText) +
+            "&_=" + Date.now();
+
+          document.body.appendChild(script);
+        }
+      ).then(function() {
+        showMessage("Camera is ready. Scan a player QR code.");
+      }).catch(function(error) {
+        scanner = null;
+        showMessage("Camera error: " + error, "#b91c1c");
+      });
+    }
+
+    function stopScanner() {
+      if (!scanner) return;
+
+      scanner.stop().then(function() {
+        scanner.clear();
+        scanner = null;
+        showMessage("Scanner stopped.");
+      }).catch(function(error) {
+        showMessage("Could not stop camera: " + error, "#b91c1c");
+      });
+    }
+  </script>
+</body>
+</html>
